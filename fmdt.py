@@ -4,7 +4,8 @@ Utility functions used in the processing of output for fmdt: https://github.com/
 
 # TODO: implement functions to split videos based on tracked objects
 
-# Structure of tracking output table of fmdt-detect 
+# Structure of tracking output table of fmdt-detect after 
+# each line gets stripped using whitespace as a delimiter
 __OBJECT_ID_COLUMN   = 0
 __START_FRAME_COLUMN = 2
 __START_X_COLUMN     = 4
@@ -101,4 +102,3 @@ def extract_all_information(detect_tracks_in: str):
             dict_array.append(line_to_dict(line.split()))
 
     return dict_array
-    
