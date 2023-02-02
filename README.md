@@ -12,3 +12,8 @@ import fmdt
 
 fmdt.split_video_at_meteors("demo.mp4", "ex1_detect_tracks.txt")
 ```
+
+#### TODO
+
+- [ ] Upload fmdt to pip so that we can download fmdt and call scripts from anywhere
+- [ ] Add API to call fmdt executables like `fmdt-detect` and `fmdt-visu`
