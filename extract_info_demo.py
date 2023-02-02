@@ -1,7 +1,7 @@
 """
 Script that demos the extraction of information from a detect tracks file produced by fmdt
 """
-import fmdt.core as fmdt
+import fmdt
 
 # TODO: verify that 
 

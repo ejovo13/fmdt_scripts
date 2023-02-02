@@ -8,7 +8,7 @@ Scripts for video editing rely on [ffmpeg-python's](https://github.com/kkroening
 Example to split a video using tracking information already provided by `fmdt-detect`:
 
 ```
-import fmdt.core as fmdt
+import fmdt
 
 fmdt.split_video_at_meteors("demo.mp4", "ex1_detect_tracks.txt")
 ```

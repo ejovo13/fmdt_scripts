@@ -20,8 +20,6 @@ def separate_meteor_sequences(tracking_list: list[dict], frame_buffer = 5) -> li
     # Let's convert the tracking list into a list of (start_frame, end_frame) tuples
     start_end = [(obj["start_frame"], obj["end_frame"]) for obj in tracking_list]
 
-    print(start_end); print(); print("\n\n\n")
-
     # Now condense overlapping sequences
     start_end_condensed = [start_end[0]]
     ci = 0 # condensed index, will not always be equal to i
