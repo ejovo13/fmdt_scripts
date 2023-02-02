@@ -229,40 +229,35 @@ def __convert_ndarray_to_video(filename_out: str, frames: np.ndarray, framerate=
     process.stdin.close()
     process.wait()
 
-
-
-
-
 def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3):
     """
     Split a video into small segments of length (nframes_before + nframes_after + 1) frames
     for each meteor detected 
     """
+
+    # Preprocessing of information held in `detect_tracks_in`
     tracking_list = extract_key_information(detect_tracks_in)
     tracking_list = __retain_meteors(tracking_list)
-    video_name, extension = __decompose_video_filename(video_filename) 
     seqs = separate_meteor_sequences(tracking_list)
+    video_name, extension = __decompose_video_filename(video_filename) 
 
-    # Max number of digits for the frames
+    # Querying of video information, extraction of frames
+    frames = __convert_video_to_ndarray(video_filename)
+    frame_rate = __get_avg_frame_rate(video_filename)
+    total_frames, _, _, _ = frames.shape
+
+    # Max number of digits for the frames in `seqs`
     max_digits = len(str(seqs[-1][1]))
     format_str = '0' + str(max_digits)
+
+    # function to create appropriate name of output videos
     seq_video_name = lambda seq: f'{video_name}_f{format(seq[0], format_str)}-{format(seq[1], format_str)}.{extension}'
 
     for s in seqs:
 
-        f_start = s[0] - 3
-        f_end   = s[1] + 3
+        # Ensure that f_start and f_end are valid
+        f_start = s[0] - nframes_before if s[0] - nframes_before >= 0 else 0
+        f_end   = s[1] + nframes_after  if s[1] + nframes_after  <= total_frames else total_frames
 
-        print("======================================")
-        print("======================================")
-        print(f"==============f0: {f_start}==============")
-        print("======================================")
-        print("======================================")
-
-        in_file = ffmpeg.input(video_filename)
-        in_file.trim(start_frame=abs(f_start)).output(seq_video_name(s)).run()
-
-    print(seqs)
-
-
-
+        frames_seq = frames[f_start:f_end, :, :, :]
+        __convert_ndarray_to_video(seq_video_name(s), frames_seq, frame_rate)
