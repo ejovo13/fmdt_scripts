@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fmdt-python"
-version = "0.0.4"
+version = "0.0.5"
 authors = [
   { name="Evan Voyles", email="ejovo13@yahoo.com" },
 ]
 description = "utlity functions for fast meteor detection toolbox"
 readme = "../README.md"
 requires-python = ">=3.7"
-requires = ["numpy", "ffmpeg-python"]
+dependencies = ["numpy", "ffmpeg-python"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
