@@ -1,7 +1,7 @@
 """
 Script that demos the extraction of information from a detect tracks file produced by fmdt
 """
-import fmdt
+import fmdt.core as fmdt
 
 # TODO: verify that 
 
@@ -19,5 +19,9 @@ print(info1); print()
 info_all_0 = fmdt.extract_all_information(ex_file_0)
 info_all_1 = fmdt.extract_all_information(ex_file_1)
 
-print(info_all_0[0]); print()
-print(info_all_1[0])
+# print(info_all_0[0]); print()
+# print(info_all_1[0])
+
+start_end = fmdt.utils.separate_meteor_sequences(info1)
+
+print(start_end)
