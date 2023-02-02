@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fmdt-python"
-version = "0.0.6"
+version = "0.0.7"
 authors = [
   { name="Evan Voyles", email="ejovo13@yahoo.com" },
 ]
