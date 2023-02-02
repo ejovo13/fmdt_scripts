@@ -1,14 +1,13 @@
 """
 Utility functions used in the processing of output for fmdt: https://github.com/alsoc/fmdt
 
-Dependencies: numpy, ffmpeg-python
+Public API:
+    extract_key_information
+    extract_all_information
+    split_video_at_meteors
 """
-
-
-
 import ffmpeg
-
-# TODO: implement functions to split videos based on tracked objects
+import numpy as np
 
 # Structure of tracking output table of fmdt-detect after 
 # each line gets stripped using whitespace as a delimiter
@@ -22,19 +21,26 @@ __END_Y_COLUMN       = 12
 __OBJECT_TYPE_COLUMN = 14
 
 def extract_key_information(detect_tracks_in: str) -> list[dict]:
-    """
-    Extract information from a detect_tracks.txt file.
+    """Extract key information from a detect_tracks.txt file.
 
-    Returns a list of dictionaries of the form
+    "Key" information refers to the start frame, end frame, and type of 
+    object detected
 
-    { 
-        "type": <"meteor" | "noise" | "start">
-        "frame_start": <int>
-        "frame_end": <int>
-    }
+    Parameters
+    ----------
+    detect_tracks_in (str): The name of a file whose content is the output
+        of fmdt_detect
 
-    where each dictionary corresponds to a single object detected by 
-    `fmdt-detect`
+    Returns
+    -------
+    dict_array (list[dict]): A list of dictionaries of the form
+        { 
+            "type": <"meteor" | "noise" | "start">
+            "frame_start": <int>
+            "frame_end": <int>
+        }
+        where each item in the list corresponds to a single object detected by 
+        `fmdt-detect`
     """
 
     # Utility function to convert a line of interest to a dictionary
@@ -61,24 +67,28 @@ def extract_key_information(detect_tracks_in: str) -> list[dict]:
     return dict_array
 
 def extract_all_information(detect_tracks_in: str) -> list[dict]:
-    """
-    Extract all tracking information from a detect_tracks.txt file.
+    """Extract all tracking information from a detect_tracks.txt file.
 
-    Returns a list of dictionaries of the form
+    Parameters
+    ----------
+    detect_tracks_in (str): The name of a file whose content is the output
+        of fmdt_detect
 
-    { 
-        "id":           <int>,
-        "start_frame":  <int>,
-        "start_x":      <float>,
-        "start_y":      <float>,
-        "end_frame":    <int>,
-        "end_x":        <float>,
-        "end_y":        <float>,
-        "type":         <"meteor" | "noise" | "start">,
-    }
-
-    where each dictionary corresponds to a single object detected by 
-    `fmdt-detect`
+    Returns
+    -------
+    dict_array (list[dict]): A list of dictionaries of the form
+        { 
+            "id":           <int>,
+            "start_frame":  <int>,
+            "start_x":      <float>,
+            "start_y":      <float>,
+            "end_frame":    <int>,
+            "end_x":        <float>,
+            "end_y":        <float>,
+            "type":         <"meteor" | "noise" | "start">,
+        }
+        where each item in the list corresponds to a single object detected by 
+        `fmdt-detect`
     """
 
     # Utility function to convert a line of interest to a dictionary
@@ -111,15 +121,12 @@ def extract_all_information(detect_tracks_in: str) -> list[dict]:
 
 
 def __retain_meteors(tracking_list: list[dict]) -> list[dict]:
-    """
-    Take a list of dictionaries returned by one of the fmdt.extract_* functions
+    """Take a list of dictionaries returned by one of the fmdt.extract_* functions
     and filter out objects that are not meteors
     """
     return [obj for obj in tracking_list if obj["type"] == "meteor"]
 
-# I want a function that takes in a dictionary of tracked meteors then computes sequences of overlap
-# We are assuming that the dictionary is in order
-def separate_meteor_sequences(tracking_list: list, frame_buffer = 5) -> list[tuple[float, float]]:
+def __separate_meteor_sequences(tracking_list: list, frame_buffer = 5) -> list[tuple[float, float]]:
     """
     Take a tracking list and compute the disparate sequences of meteors 
 
@@ -178,7 +185,6 @@ def __decompose_video_filename(filename: str) -> tuple[str, str]:
     assert len(sep) == 2, "Filename has multiply periods"
     return (sep[0], sep[1])
 
-import numpy as np
 
 def __convert_video_to_ndarray(filename: str) -> np.ndarray:
     """
@@ -238,7 +244,7 @@ def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_b
     # Preprocessing of information held in `detect_tracks_in`
     tracking_list = extract_key_information(detect_tracks_in)
     tracking_list = __retain_meteors(tracking_list)
-    seqs = separate_meteor_sequences(tracking_list)
+    seqs = __separate_meteor_sequences(tracking_list)
     video_name, extension = __decompose_video_filename(video_filename) 
 
     # Querying of video information, extraction of frames
