@@ -1,5 +1,14 @@
 A series of Python scripts to facilitate the processing of [fmdt's](https://github.com/alsoc/fmdt) output
 
-The Python module `fmdt.py` contains the core functionality used by various scripts. 
-
 Scripts for video editing rely on [ffmpeg-python's](https://github.com/kkroening/ffmpeg-python) simple Python bindings to ffmpeg. Make sure you install `ffmpeg-python` before trying any of the video editing functionality.
+
+`fmdt/core.py` should contain the functions that are called directly in scripts.
+`fmdt/utils.py` contains utility functions that `fmdt.core` makes use of.
+
+Example to split a video using tracking information already provided by `fmdt-detect`:
+
+```
+import fmdt.core as fmdt
+
+fmdt.split_video_at_meteors("demo.mp4", "ex1_detect_tracks.txt")
+```
