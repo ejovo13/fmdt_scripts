@@ -2,6 +2,7 @@ import ffmpeg
 import os
 import sys
 import numpy as np
+import subprocess
 
 def retain_meteors(tracking_list: list[dict]) -> list[dict]:
     """Take a list of dictionaries returned by one of the fmdt.extract_* functions
@@ -35,7 +36,7 @@ def separate_meteor_sequences(tracking_list: list[dict], frame_buffer = 5) -> li
     return start_end_condensed
 
 # =============================== Video file functions ========================================
-def get_avg_frame_rate(filename) -> float:
+def get_avg_frame_rate(filename: str) -> float:
     """
     Get the average framerate of a video
     
@@ -46,13 +47,13 @@ def get_avg_frame_rate(filename) -> float:
     frame_rates = video_stream['avg_frame_rate'].split('/')
     return float(frame_rates[0]) / float(frame_rates[1])
 
-def get_video_width(filename) -> int:
+def get_video_width(filename: str) -> int:
     probe = ffmpeg.probe(filename)
     video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
     return int(video_stream['width'])
 
 
-def get_video_height(filename) -> int:
+def get_video_height(filename: str) -> int:
     probe = ffmpeg.probe(filename)
     video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
     return int(video_stream['height'])
@@ -70,7 +71,56 @@ def decompose_video_filename(filename: str) -> tuple[str, str]:
 
 def assert_file_exists(filename: str) -> None:
     assert os.path.exists(filename), f"{filename} not found"
-        
+
+def time_s_to_ffmpeg_format(time) -> str:
+
+    time_h = int(time // (60 * 60))
+    time -= time_h * 60 * 60
+    time_m = int(time // 60)
+    time -= time_m * 60
+    time_s = int(np.floor(time)) 
+
+    return f"{time_h:02}:{time_m:02}:{time_s:02}"
+
+# def frame_number_to_ffmpeg_format(filename: str, frame_number: int, seconds_offset=0) -> str:
+
+#     assert_file_exists(filename)
+#     fps = get_avg_frame_rate(filename)
+#     start_time = frame_number / fps + seconds_offset
+
+#     return time_s_to_ffmpeg_format(start_time)
+
+
+def extract_video_frames(filename: str, start_frame: int, end_frame: int, out_file: str | None = None, quiet=True, overwrite=False) -> None:
+
+    assert_file_exists(filename)
+
+    if out_file is None:
+        # Then create our own name for the new video
+        name, ext = decompose_video_filename(filename)
+        out_file = f"{name}_f{start_frame}-{end_frame}.{ext}"
+
+    fps = get_avg_frame_rate(filename)
+    start_time = (start_frame / fps) - 1 # offset by at most one second
+    start_time = time_s_to_ffmpeg_format(start_time)
+
+    # Calculate the duration.
+    duration = (end_frame - start_frame) / fps
+    duration = time_s_to_ffmpeg_format(duration + 1) # Add one second to the duration
+
+    # end_time   = frame_number_to_ffmpeg_format(filename, start_frame, seconds_offset=1)
+
+    args = ["ffmpeg", "-ss", start_time, "-i", filename, "-t", duration, out_file]
+
+    if quiet:
+        args.extend(["-loglevel", "error"])
+
+    if overwrite:
+        args.append("-y")
+
+    print(f"Running command '{' '.join(args)}'")
+    subprocess.run(args)
+
 
 
 def convert_video_to_ndarray(filename: str, log=False) -> np.ndarray:
