@@ -1,4 +1,4 @@
-"""Unit tests for fmdt.py
+"""Unit tests for fmdt
 """
 import unittest
 import fmdt
