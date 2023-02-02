@@ -119,7 +119,7 @@ def extract_all_information(detect_tracks_in: str) -> list[dict]:
 
     return dict_array
 
-def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3, overwrite=False, exact_split: bool = False) -> None:
+def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3, overwrite=False, exact_split: bool = False, log: bool = False) -> None:
     """
     Split a video into small segments of length (nframes_before + nframes_after + sequence_length) frames
     for each meteor detected 
@@ -141,6 +141,7 @@ def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_b
         seeking functionality (False). For long videos with high resolution, use False otherwise the program 
         might crash. 
         (Default value of False)
+    log (bool): When True, print to console the current action being performed
     """
     utils.assert_file_exists(video_filename)
     utils.assert_file_exists(detect_tracks_in)
@@ -159,7 +160,7 @@ def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_b
     if exact_split:
         
         # Querying of video information, extraction of frames
-        frames = utils.convert_video_to_ndarray(video_filename)
+        frames = utils.convert_video_to_ndarray(video_filename, log=log)
         frame_rate = utils.get_avg_frame_rate(video_filename)
         total_frames, _, _, _ = frames.shape
         seq_video_name = lambda seq: f'{video_name}_f{format(seq[0], format_str)}-{format(seq[1], format_str)}.{extension}'
@@ -167,10 +168,10 @@ def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_b
         def exact_splitting(seq) -> None:
 
             # Ensure that f_start and f_end are valid
-            frames_seq = frames[f_start:f_end, :, :, :]
             f_start = s[0] - nframes_before if s[0] - nframes_before >= 0 else 0
             f_end   = s[1] + nframes_after  if s[1] + nframes_after  <= total_frames else total_frames
-            utils.convert_ndarray_to_video(seq_video_name(s), frames_seq, frame_rate)
+            frames_seq = frames[f_start:f_end, :, :, :]
+            utils.convert_ndarray_to_video(seq_video_name(s), frames_seq, frame_rate, log=log)
 
         splitting_algorithm = exact_splitting
     
