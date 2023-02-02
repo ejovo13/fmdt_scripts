@@ -24,7 +24,7 @@ def detect(in_video: str, out_track_file: str | None = None, out_bb_file: str | 
             subprocess.run(args, stdout=outfile)
 
 
-def visu(in_video: str, in_track_file: str, in_bb_file: str, out_visu_file: str | None = None) -> None:
+def visu(in_video: str, in_track_file: str, in_bb_file: str, out_visu_file: str | None = None, show_id: bool = False) -> None:
 
     fmdt_visu_exe = shutil.which("fmdt-visu")
     fmdt_visu_found = not fmdt_visu_exe is None
@@ -34,5 +34,8 @@ def visu(in_video: str, in_track_file: str, in_bb_file: str, out_visu_file: str 
 
     if not out_visu_file is None:
         args.extend(["--out-video", out_visu_file])
+
+    if show_id:
+        args.append("--show-id")
 
     subprocess.run(args)

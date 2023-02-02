@@ -119,7 +119,7 @@ def extract_all_information(detect_tracks_in: str) -> list[dict]:
 
     return dict_array
 
-def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3) -> None:
+def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3, overwrite=False) -> None:
     """
     Split a video into small segments of length (nframes_before + nframes_after + sequence_length) frames
     for each meteor detected 
@@ -134,9 +134,9 @@ def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_b
     video_name, extension = utils.decompose_video_filename(video_filename) 
 
     # Querying of video information, extraction of frames
-    frames = utils.convert_video_to_ndarray(video_filename)
-    frame_rate = utils.get_avg_frame_rate(video_filename)
-    total_frames, _, _, _ = frames.shape
+    # frames = utils.convert_video_to_ndarray(video_filename)
+    # frame_rate = utils.get_avg_frame_rate(video_filename)
+    # total_frames, _, _, _ = frames.shape
 
     # Max number of digits for the frames in `seqs`
     max_digits = len(str(seqs[-1][1]))
@@ -149,7 +149,9 @@ def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_b
 
         # Ensure that f_start and f_end are valid
         f_start = s[0] - nframes_before if s[0] - nframes_before >= 0 else 0
-        f_end   = s[1] + nframes_after  if s[1] + nframes_after  <= total_frames else total_frames
+        # f_end   = s[1] + nframes_after  if s[1] + nframes_after  <= total_frames else total_frames
+        f_end   = s[1] + nframes_after
 
-        frames_seq = frames[f_start:f_end, :, :, :]
-        utils.convert_ndarray_to_video(seq_video_name(s), frames_seq, frame_rate)
+        # frames_seq = frames[f_start:f_end, :, :, :]
+        # utils.convert_ndarray_to_video(seq_video_name(s), frames_seq, frame_rate)
+        utils.extract_video_frames(video_filename, f_start, f_end, seq_video_name(s), overwrite=overwrite)
