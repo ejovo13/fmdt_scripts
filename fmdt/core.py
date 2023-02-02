@@ -119,10 +119,28 @@ def extract_all_information(detect_tracks_in: str) -> list[dict]:
 
     return dict_array
 
-def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3, overwrite=False) -> None:
+def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3, overwrite=False, exact_split: bool = False) -> None:
     """
     Split a video into small segments of length (nframes_before + nframes_after + sequence_length) frames
     for each meteor detected 
+
+    Parameters
+    ----------
+    video_filename (str): Filename of video to split 
+    detect_tracks_in (str): Filename of tracks recorded by a call to 
+        fmdt.detect(video_filename, out_track_file=detect_tracks_in)
+    nframes_before (int): Number of frames to extract before the meteor sequence begins
+        (Default value of 3)
+    nframes_after (int): Number of frames to extract after the meteor sequence ends
+        (Default value of 3)
+    overwrite (bool): Tells ffmpeg to overwrite (True) the generated output videos if they already
+        exist. If false then ffmpeg will ask for manual confirmation
+        (Default value of False)
+    exact_split (bool): Determine whether to extract the _exact_ frames requested (True) - which requires loading
+        the entire video into memory as a numpy array - or approximate the frames requested using ffmpeg's 
+        seeking functionality (False). For long videos with high resolution, use False otherwise the program 
+        might crash. 
+        (Default value of False)
     """
     utils.assert_file_exists(video_filename)
     utils.assert_file_exists(detect_tracks_in)
@@ -133,25 +151,40 @@ def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_b
     seqs = utils.separate_meteor_sequences(tracking_list)
     video_name, extension = utils.decompose_video_filename(video_filename) 
 
-    # Querying of video information, extraction of frames
-    # frames = utils.convert_video_to_ndarray(video_filename)
-    # frame_rate = utils.get_avg_frame_rate(video_filename)
-    # total_frames, _, _, _ = frames.shape
-
-    # Max number of digits for the frames in `seqs`
+    # Bookkeeping for formatting the name of the output videos
     max_digits = len(str(seqs[-1][1]))
     format_str = '0' + str(max_digits)
 
-    # function to create appropriate name of output videos
-    seq_video_name = lambda seq: f'{video_name}_f{format(seq[0], format_str)}-{format(seq[1], format_str)}.{extension}'
+    # Selection of splitting algorithm
+    if exact_split:
+        
+        # Querying of video information, extraction of frames
+        frames = utils.convert_video_to_ndarray(video_filename)
+        frame_rate = utils.get_avg_frame_rate(video_filename)
+        total_frames, _, _, _ = frames.shape
+        seq_video_name = lambda seq: f'{video_name}_f{format(seq[0], format_str)}-{format(seq[1], format_str)}.{extension}'
+
+        def exact_splitting(seq) -> None:
+
+            # Ensure that f_start and f_end are valid
+            frames_seq = frames[f_start:f_end, :, :, :]
+            f_start = s[0] - nframes_before if s[0] - nframes_before >= 0 else 0
+            f_end   = s[1] + nframes_after  if s[1] + nframes_after  <= total_frames else total_frames
+            utils.convert_ndarray_to_video(seq_video_name(s), frames_seq, frame_rate)
+
+        splitting_algorithm = exact_splitting
+    
+    else:
+
+        seq_video_name = lambda seq: f'{video_name}_f{format(seq[0], format_str)}-{format(seq[1], format_str)}_.{extension}'
+
+        def approx_splitting(seq) -> None:
+
+            f_start = s[0] - nframes_before if s[0] - nframes_before >= 0 else 0
+            f_end   = s[1] + nframes_after
+            utils.extract_video_frames(video_filename, f_start, f_end, seq_video_name(s), overwrite=overwrite)
+
+        splitting_algorithm = approx_splitting
 
     for s in seqs:
-
-        # Ensure that f_start and f_end are valid
-        f_start = s[0] - nframes_before if s[0] - nframes_before >= 0 else 0
-        # f_end   = s[1] + nframes_after  if s[1] + nframes_after  <= total_frames else total_frames
-        f_end   = s[1] + nframes_after
-
-        # frames_seq = frames[f_start:f_end, :, :, :]
-        # utils.convert_ndarray_to_video(seq_video_name(s), frames_seq, frame_rate)
-        utils.extract_video_frames(video_filename, f_start, f_end, seq_video_name(s), overwrite=overwrite)
+        splitting_algorithm(s)
