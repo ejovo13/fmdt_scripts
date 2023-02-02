@@ -1,6 +1,12 @@
 """
 Utility functions used in the processing of output for fmdt: https://github.com/alsoc/fmdt
+
+Dependencies: numpy, ffmpeg-python
 """
+
+
+
+import ffmpeg
 
 # TODO: implement functions to split videos based on tracked objects
 
@@ -15,7 +21,7 @@ __END_X_COLUMN       = 10
 __END_Y_COLUMN       = 12
 __OBJECT_TYPE_COLUMN = 14
 
-def extract_key_information(detect_tracks_in: str):
+def extract_key_information(detect_tracks_in: str) -> list[dict]:
     """
     Extract information from a detect_tracks.txt file.
 
@@ -36,8 +42,8 @@ def extract_key_information(detect_tracks_in: str):
 
         return {
             "type":         split_line[__OBJECT_TYPE_COLUMN],
-            "start_frame":  split_line[__START_FRAME_COLUMN],
-            "end_frame":    split_line[__END_FRAME_COLUMN]
+            "start_frame":  int(split_line[__START_FRAME_COLUMN]),
+            "end_frame":    int(split_line[__END_FRAME_COLUMN])
         }
 
     # Utility boolean function to extract only the important lines
@@ -54,7 +60,7 @@ def extract_key_information(detect_tracks_in: str):
 
     return dict_array
 
-def extract_all_information(detect_tracks_in: str):
+def extract_all_information(detect_tracks_in: str) -> list[dict]:
     """
     Extract all tracking information from a detect_tracks.txt file.
 
@@ -63,11 +69,11 @@ def extract_all_information(detect_tracks_in: str):
     { 
         "id":           <int>,
         "start_frame":  <int>,
-        "start_x":      <int>,
-        "start_y":      <int>,
+        "start_x":      <float>,
+        "start_y":      <float>,
         "end_frame":    <int>,
-        "end_x":        <int>,
-        "end_y":        <int>,
+        "end_x":        <float>,
+        "end_y":        <float>,
         "type":         <"meteor" | "noise" | "start">,
     }
 
@@ -79,13 +85,13 @@ def extract_all_information(detect_tracks_in: str):
     def line_to_dict(split_line: list):
 
         return {
-            "id":           split_line[__OBJECT_ID_COLUMN],
-            "start_frame":  split_line[__START_FRAME_COLUMN],
-            "start_x":      split_line[__START_X_COLUMN],
-            "start_y":      split_line[__START_Y_COLUMN],
-            "end_frame":    split_line[__END_FRAME_COLUMN],
-            "end_x":        split_line[__END_X_COLUMN],
-            "end_y":        split_line[__END_Y_COLUMN],
+            "id":           int(split_line[__OBJECT_ID_COLUMN]),
+            "start_frame":  int(split_line[__START_FRAME_COLUMN]),
+            "start_x":      float(split_line[__START_X_COLUMN]),
+            "start_y":      float(split_line[__START_Y_COLUMN]),
+            "end_frame":    int(split_line[__END_FRAME_COLUMN]),
+            "end_x":        float(split_line[__END_X_COLUMN]),
+            "end_y":        float(split_line[__END_Y_COLUMN]),
             "type":         split_line[__OBJECT_TYPE_COLUMN]
         }
 
@@ -102,3 +108,161 @@ def extract_all_information(detect_tracks_in: str):
             dict_array.append(line_to_dict(line.split()))
 
     return dict_array
+
+
+def __retain_meteors(tracking_list: list[dict]) -> list[dict]:
+    """
+    Take a list of dictionaries returned by one of the fmdt.extract_* functions
+    and filter out objects that are not meteors
+    """
+    return [obj for obj in tracking_list if obj["type"] == "meteor"]
+
+# I want a function that takes in a dictionary of tracked meteors then computes sequences of overlap
+# We are assuming that the dictionary is in order
+def separate_meteor_sequences(tracking_list: list, frame_buffer = 5) -> list[tuple[float, float]]:
+    """
+    Take a tracking list and compute the disparate sequences of meteors 
+
+    If two meteors are within frame_buffer frames of each other, consider them as part of the
+    same sequence
+    """
+
+    # Let's convert the tracking list into a list of (start_frame, end_frame) tuples
+    start_end = [(obj["start_frame"], obj["end_frame"]) for obj in tracking_list]
+
+    # Now condense overlapping sequences
+    start_end_condensed = [start_end[0]]
+    ci = 0 # condensed index, will not always be equal to i
+    for i in range(len(start_end) - 1):
+
+        # If the end frame of one meteor is close to the start frame of the next, condense the two sequences
+        if (start_end_condensed[ci][1] + frame_buffer > start_end[i + 1][0]):
+            start_end_condensed[ci] = (start_end_condensed[ci][0], start_end[i + 1][1])
+        else:
+            ci = ci + 1
+            start_end_condensed.append(start_end[i + 1]) 
+
+    return start_end_condensed
+
+# =============================== Video file functions ========================================
+def __get_avg_frame_rate(filename) -> float:
+    """
+    Get the average framerate of a video
+    
+    Adapted from https://github.com/kkroening/ffmpeg-python/blob/master/examples/video_info.py#L15
+    """
+    probe = ffmpeg.probe(filename)
+    video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+    frame_rates = video_stream['avg_frame_rate'].split('/')
+    return float(frame_rates[0]) / float(frame_rates[1])
+
+def __get_video_width(filename) -> int:
+    probe = ffmpeg.probe(filename)
+    video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+    return int(video_stream['width'])
+
+
+def __get_video_height(filename) -> int:
+    probe = ffmpeg.probe(filename)
+    video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+    return int(video_stream['height'])
+
+    
+def __decompose_video_filename(filename: str) -> tuple[str, str]:
+    """
+    Seperate the video filename from the extension
+
+    __decompose_video_filename("vid.mp4") -> ("vid", "mp4") 
+    """
+    sep = filename.split('.')
+    assert len(sep) == 2, "Filename has multiply periods"
+    return (sep[0], sep[1])
+
+import numpy as np
+
+def __convert_video_to_ndarray(filename: str) -> np.ndarray:
+    """
+    Convert a video file to a numpy array of size [n_frames, height, width, 3] 
+
+    Taken from ffmpeg-python's documentation https://github.com/kkroening/ffmpeg-python/blob/master/examples/README.md#convert-video-to-numpy-array
+    """
+
+    fps = __get_avg_frame_rate(filename)
+    w   = __get_video_width(filename)
+    h   = __get_video_height(filename)
+
+    out, _ = (
+        ffmpeg
+        .input(filename)
+        .output('pipe:', format='rawvideo', pix_fmt='rgb24')
+        .run(capture_stdout=True)
+    )
+    video = (
+        np
+        .frombuffer(out, np.uint8)
+        .reshape([-1, h, w, 3])
+    )
+
+    return video
+
+def __convert_ndarray_to_video(filename_out: str, frames: np.ndarray, framerate=60, vcodec='libx264') -> None:
+    """
+    Convert a rgb numpy array to video using ffmpeg-python
+
+    Adopted from https://github.com/kkroening/ffmpeg-python/issues/246#issuecomment-520200981 
+    """
+
+    _, h, w, _ = frames.shape
+    process = (
+        ffmpeg
+            .input('pipe:', format='rawvideo', pix_fmt='rgb24', s='{}x{}'.format(w, h))
+            .output(filename_out, pix_fmt='yuv420p', vcodec=vcodec, r=framerate)
+            .overwrite_output()
+            .run_async(pipe_stdin=True)
+    )
+    for frame in frames:
+        process.stdin.write(
+            frame
+                .astype(np.uint8)
+                .tobytes()
+        )
+    process.stdin.close()
+    process.wait()
+
+
+
+
+
+def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3):
+    """
+    Split a video into small segments of length (nframes_before + nframes_after + 1) frames
+    for each meteor detected 
+    """
+    tracking_list = extract_key_information(detect_tracks_in)
+    tracking_list = __retain_meteors(tracking_list)
+    video_name, extension = __decompose_video_filename(video_filename) 
+    seqs = separate_meteor_sequences(tracking_list)
+
+    # Max number of digits for the frames
+    max_digits = len(str(seqs[-1][1]))
+    format_str = '0' + str(max_digits)
+    seq_video_name = lambda seq: f'{video_name}_f{format(seq[0], format_str)}-{format(seq[1], format_str)}.{extension}'
+
+    for s in seqs:
+
+        f_start = s[0] - 3
+        f_end   = s[1] + 3
+
+        print("======================================")
+        print("======================================")
+        print(f"==============f0: {f_start}==============")
+        print("======================================")
+        print("======================================")
+
+        in_file = ffmpeg.input(video_filename)
+        in_file.trim(start_frame=abs(f_start)).output(seq_video_name(s)).run()
+
+    print(seqs)
+
+
+
