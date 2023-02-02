@@ -8,6 +8,8 @@ Public API:
 """
 import ffmpeg
 import numpy as np
+import sys
+import os
 
 # Structure of tracking output table of fmdt-detect after 
 # each line gets stripped using whitespace as a delimiter
@@ -185,13 +187,22 @@ def __decompose_video_filename(filename: str) -> tuple[str, str]:
     assert len(sep) == 2, "Filename has multiply periods"
     return (sep[0], sep[1])
 
+def __assert_file_exists(filename: str) -> None:
+    assert os.path.exists(filename), f"{filename} not found"
+        
 
-def __convert_video_to_ndarray(filename: str) -> np.ndarray:
+
+def __convert_video_to_ndarray(filename: str, log=False) -> np.ndarray:
     """
     Convert a video file to a numpy array of size [n_frames, height, width, 3] 
 
     Taken from ffmpeg-python's documentation https://github.com/kkroening/ffmpeg-python/blob/master/examples/README.md#convert-video-to-numpy-array
     """
+
+    __assert_file_exists(filename)
+
+    if log:
+        print(f"converting '{filename}' to ndarray", file=sys.stderr)
 
     fps = __get_avg_frame_rate(filename)
     w   = __get_video_width(filename)
@@ -201,7 +212,7 @@ def __convert_video_to_ndarray(filename: str) -> np.ndarray:
         ffmpeg
         .input(filename)
         .output('pipe:', format='rawvideo', pix_fmt='rgb24')
-        .run(capture_stdout=True)
+        .run(capture_stdout=True, quiet=True)
     )
     video = (
         np
@@ -211,20 +222,25 @@ def __convert_video_to_ndarray(filename: str) -> np.ndarray:
 
     return video
 
-def __convert_ndarray_to_video(filename_out: str, frames: np.ndarray, framerate=60, vcodec='libx264') -> None:
+def __convert_ndarray_to_video(filename_out: str, frames: np.ndarray, framerate=60, vcodec='libx264', log=False) -> None:
     """
     Convert a rgb numpy array to video using ffmpeg-python
 
-    Adopted from https://github.com/kkroening/ffmpeg-python/issues/246#issuecomment-520200981 
+    Adapted from https://github.com/kkroening/ffmpeg-python/issues/246#issuecomment-520200981 
     """
+
+    if log:
+        print(f"converting ndarray to '{filename_out}'", file=sys.stderr)
 
     _, h, w, _ = frames.shape
     process = (
         ffmpeg
             .input('pipe:', format='rawvideo', pix_fmt='rgb24', s='{}x{}'.format(w, h))
-            .output(filename_out, pix_fmt='yuv420p', vcodec=vcodec, r=framerate)
+            # .output(filename_out, pix_fmt='yuv420p', vcodec=vcodec, r=framerate)
+            # .output(filename_out, pix_fmt='rgb24', vcodec=vcodec, r=framerate)
+            .output(filename_out, pix_fmt='rgb24', r=framerate)
             .overwrite_output()
-            .run_async(pipe_stdin=True)
+            .run_async(pipe_stdin=True, quiet=True)
     )
     for frame in frames:
         process.stdin.write(
@@ -233,13 +249,17 @@ def __convert_ndarray_to_video(filename_out: str, frames: np.ndarray, framerate=
                 .tobytes()
         )
     process.stdin.close()
+    process.stdout.close()
+    process.stderr.close()
     process.wait()
 
-def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3):
+def split_video_at_meteors(video_filename: str, detect_tracks_in: str, nframes_before=3, nframes_after=3) -> None:
     """
-    Split a video into small segments of length (nframes_before + nframes_after + 1) frames
+    Split a video into small segments of length (nframes_before + nframes_after + sequence_length) frames
     for each meteor detected 
     """
+    __assert_file_exists(video_filename)
+    __assert_file_exists(detect_tracks_in)
 
     # Preprocessing of information held in `detect_tracks_in`
     tracking_list = extract_key_information(detect_tracks_in)
