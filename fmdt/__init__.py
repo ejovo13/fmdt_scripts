@@ -6,5 +6,6 @@ from fmdt.core import (
 
 from fmdt.api  import (
     detect,
-    visu
+    visu,
+    count
 )

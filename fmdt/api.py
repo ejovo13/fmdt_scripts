@@ -5,6 +5,31 @@ are on the system path
 
 import shutil
 import subprocess
+import fmdt.core
+import fmdt.utils
+import fmdt.args
+
+def count(trk_bb_path: str, stars: bool = False, meteors: bool = True, noise: bool = False, all: bool = False) -> int:
+    """Count the number of meteors detected in a tracks_bb file"""
+    if all:
+        stars = True
+        meteors = True
+        noise = True
+
+    tracked = fmdt.core.extract_key_information(trk_bb_path)
+
+    if not stars:
+        tracked = [t for t in tracked if t["type"] != "star"]
+
+    if not meteors:
+        tracked = [t for t in tracked if t["type"] != "meteor"]
+
+    if not noise:
+        tracked = [t for t in tracked if t["type"] != "noise"]
+
+    # tracked_meteors = fmdt.utils.retain_meteors(tracked)
+    return len(tracked)
+    
 
 def detect(
         vid_in_path: str, 
@@ -33,80 +58,35 @@ def detect(
         trk_all: bool | None = None,
         trk_bb_path: str | None = None,
         trk_mag_path: str | None = None,
+        log_path: str | None = None,
         out_track_file: str | None = None,
-    ) -> None:
+        log: bool = False
+    ) -> fmdt.args.Args:
 
-    fmdt_detect_exe = shutil.which("fmdt-detect")
-    fmdt_detect_found = not fmdt_detect_exe is None
-    assert fmdt_detect_found, "fmdt-detect executable not found"
+    # Wrap up all of the arguments into a dictionary
+    detect_args = fmdt.args.detect_args(vid_in_path, vid_in_start, vid_in_stop, 
+        vid_in_skip, vid_in_buff, vid_in_loop, vid_in_threads, light_min, light_max, 
+        ccl_fra_path, ccl_fra_id, mrp_s_min, mrp_s_max, knn_k, knn_d, knn_s, trk_ext_d,
+        trk_ext_o, trk_angle, trk_star_min, trk_meteor_min, trk_meteor_max, trk_ddev, 
+        trk_all, trk_bb_path, trk_mag_path, log_path, out_track_file, log
+    )
 
-    args = [fmdt_detect_exe, "--in-video", vid_in_path]
-
-    if not vid_in_skip is None:
-        args.extend(["--vid-in-skip", vid_in_skip])
-
-    if not vid_in_buff is None:
-        args.extend(["--vid-in-buff"])
-
-    if not vid_in_threads is None:
-        args.extend(["--vid-in-threads", vid_in_threads])
-
-    if not light_min is None:
-        args.extend(["--ccl-hyst-lo", light_min])
-
-    if not light_max is None:
-        args.extend(["--ccl-hyst-hi", light_max])
-
-    if not ccl_fra_path is None:
-        args.extend(["--ccl_fra_path", ccl_fra_path])
-
-    if not ccl_fra_id is None:
-        args.extend(["--ccl-fra-id"])
-
-    if not mrp_s_min is None:
-        args.extend(["--mrp-s-min", mrp_s_min])
-
-    if not mrp_s_max is None:
-        args.extend(["--mrp-s-max", mrp_s_max])
-
-    if not knn_k is None:
-        args.extend(["--knn-k", knn_k])
-
-    if not knn_d is None:
-        args.extend(["--knn-d", knn_d])
-
-    if not knn_s is None:
-        args.extend(["--knn-s", knn_s])
-
-    if not trk_ext_d is None:
-        args.extend(["--trk-ext-d", trk_ext_d])
-
-    if not trk_ext_o is None:
-        args.extend(["--trk-ext-o", trk_ext_o])
-
-    if not trk_angle is None:
-        args.extend(["--trk-angle", trk_angle])
-
-    if not trk_star_min is None:
-        args.extend(["--trk-star-min", trk_star_min])
-
-    if not vid_in_start is None:
-        args.extend(["--vid-in-start", vid_in_start])
-
-    if not vid_in_stop is None:
-        args.extend(["--vid-in-stop", vid_in_stop])
-
-    if not trk_bb_path is None:
-        args.extend(["--trk-bb-path", trk_bb_path])
-
-    if not vid_in_loop is None:
-        args.extend(["--vid-in-loop", vid_in_loop])
+    # Spit out the commandline
+    args = fmdt.args.handle_detect_args(**detect_args)
 
     if out_track_file is None:
+        if log:
+            print(f"Executing cmd: {' '.join(args)}")
         subprocess.run(args)
     else:
         with open(out_track_file, 'w') as outfile:
+            if log:
+                print(f"Executing cmd: {' '.join(args)}")
             subprocess.run(args, stdout=outfile)
+    
+    # And return the Args object that keeps track of the detect call
+
+    
 
 
 def visu(in_video: str, in_track_file: str, in_bb_file: str, out_visu_file: str | None = None, show_id: bool = False) -> None:
