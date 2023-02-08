@@ -176,7 +176,7 @@ def handle_detect_args(
     fmdt_detect_exe = shutil.which("fmdt-detect")
     fmdt_detect_found = not fmdt_detect_exe is None
     assert fmdt_detect_found, "fmdt-detect executable not found"
-    args = [fmdt_detect_exe, "--in-video", vid_in_path]
+    args = [fmdt_detect_exe, "--vid-in-path", vid_in_path]
 
     if not vid_in_skip is None:
         args.extend(["--vid-in-skip", vid_in_skip])
