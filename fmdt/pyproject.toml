@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fmdt-python"
-packages = ["fmdt"]
-version = "0.0.10"
+packages = [ { include = "fmdt" }, ]
+version = "0.0.11"
 authors = [
   { name="Evan Voyles", email="ejovo13@yahoo.com" },
 ]
